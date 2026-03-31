@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>郵便番号検索</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 60px 16px;
+    }
+    .container {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 1.4rem;
+      color: #333;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .input-group span {
+      font-size: 1.6rem;
+      line-height: 44px;
+      color: #666;
+    }
+    input {
+      flex: 1;
+      padding: 10px 14px;
+      font-size: 1.1rem;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+      letter-spacing: 0.1em;
+    }
+    input:focus { border-color: #4a90d9; }
+    button {
+      padding: 10px 24px;
+      font-size: 1rem;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    button:hover { background: #3a7bc8; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    .result {
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      display: none;
+    }
+    .result.show { display: block; }
+    .result dl {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 8px 12px;
+    }
+    .result dt { font-weight: bold; color: #555; }
+    .result dd { color: #333; }
+    .error {
+      color: #e53e3e;
+      text-align: center;
+      margin-top: 12px;
+      display: none;
+    }
+    .error.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>郵便番号から住所検索</h1>
+    <div class="input-group">
+      <span>〒</span>
+      <input type="text" id="zipcode" placeholder="1000001" maxlength="8" inputmode="numeric">
+      <button id="searchBtn" onclick="search()">検索</button>
+    </div>
+    <p class="error" id="error"></p>
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    const zipcodeInput = document.getElementById('zipcode');
+    const resultDiv = document.getElementById('result');
+    const errorP = document.getElementById('error');
+    const searchBtn = document.getElementById('searchBtn');
+
+    zipcodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') search();
+    });
+
+    async function search() {
+      const raw = zipcodeInput.value.replace(/[^0-9]/g, '');
+      if (raw.length !== 7) {
+        showError('郵便番号は7桁の数字で入力してください');
+        return;
+      }
+
+      resultDiv.classList.remove('show');
+      errorP.classList.remove('show');
+      searchBtn.disabled = true;
+      searchBtn.textContent = '検索中…';
+
+      try {
+        const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${raw}`);
+        const data = await res.json();
+
+        if (data.status !== 200) {
+          showError(data.message || 'APIエラーが発生しました');
+          return;
+        }
+        if (!data.results) {
+          showError('該当する住所が見つかりませんでした');
+          return;
+        }
+
+        let html = '';
+        data.results.forEach((r) => {
+          html += `<dl>
+            <dt>郵便番号</dt><dd>〒${r.zipcode.slice(0,3)}-${r.zipcode.slice(3)}</dd>
+            <dt>都道府県</dt><dd>${r.address1}</dd>
+            <dt>市区町村</dt><dd>${r.address2}</dd>
+            <dt>町域</dt><dd>${r.address3}</dd>
+          </dl>`;
+        });
+        resultDiv.innerHTML = html;
+        resultDiv.classList.add('show');
+      } catch (e) {
+        showError('通信エラーが発生しました。ネットワーク接続を確認してください。');
+      } finally {
+        searchBtn.disabled = false;
+        searchBtn.textContent = '検索';
+      }
+    }
+
+    function showError(msg) {
+      errorP.textContent = msg;
+      errorP.classList.add('show');
+      resultDiv.classList.remove('show');
+    }
+  </script>
+</body>
+</html>
